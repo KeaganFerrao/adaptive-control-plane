@@ -1,0 +1,202 @@
+{{ template "header.html" . }}
+
+<start href="/">Back to Agents List</start>
+
+<style>
+    td {
+        padding: 5px
+    }
+    .config-table {
+        table-layout: fixed;
+        width: 100%;
+    }
+    .config-table > tbody > tr > td {
+        width: 50%;
+    }
+    .config-table pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: auto;
+        max-height: 500px;
+        border: 1px solid #ccc;
+        padding: 5px;
+    }
+    .config-table textarea {
+        width: 100%;
+        box-sizing: border-box;
+    }
+</style>
+
+<link rel="stylesheet"
+      href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/default.min.css">
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/highlight.min.js"></script>
+<script>hljs.highlightAll();</script>
+
+<hr/>
+
+<table>
+    <tr>
+        <td valign="top">
+            <h3>Agent</h3>
+            <table border="1" style="border-collapse: collapse">
+                <tr>
+                    <td>Instance ID:</td><td>{{ .InstanceIdStr }}</td>
+                </tr>
+                {{if .Status.Health }}
+                <tr>
+                    <td>Up:</td><td>{{ .Status.Health.Healthy }}</td>
+                </tr>
+                {{if .Status.Health.LastError }}
+                <tr>
+                    <td></td><td><span style="color:red">{{ .Status.Health.LastError }}</span></td>
+                </tr>
+                {{end}}
+                {{if .Status.Health.Healthy }}
+                <tr>
+                    <td>Up since:</td><td>{{ .StartedAt }}</td>
+                </tr>
+                <tr>
+                    <td>Uptime:</td><td>{{ .Uptime }}</td>
+                </tr>
+                {{end}}
+                {{end}}
+            </table>
+        </td>
+        <td valign="top">
+            <h3>Attributes</h3>
+            <table border="1" style="border-collapse: collapse">
+                {{ range .Status.AgentDescription.IdentifyingAttributes }}
+                </tr>
+                <td>{{ .Key }}</td><td>{{ .Value }}</td>
+                </tr>
+                {{ end }}
+                {{ range .Status.AgentDescription.NonIdentifyingAttributes }}
+                </tr>
+                <td>{{ .Key }}</td><td>{{ .Value }}</td>
+                </tr>
+                {{ end }}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+<h3>Configuration</h3>
+<table class="config-table">
+    <tr>
+        <td valign="top">
+            Current Effective Configuration:<br/>
+            <pre><code class="language-yaml">{{ .EffectiveConfig }}</code></pre>
+        </td>
+        <td valign="top">
+            Additional Configuration:<br/>
+            <form action="/save_config" method="post">
+            <input type="hidden" name="instanceid" value="{{ .InstanceIdStr }}"/>
+            <textarea rows="20" name="config">{{ .CustomInstanceConfig }}</textarea><br/>
+             {{if .Status.RemoteConfigStatus }}
+                {{if .Status.RemoteConfigStatus.ErrorMessage }}
+                <span style="color:red">Failed: {{ .Status.RemoteConfigStatus.ErrorMessage }}</span><br/>
+                {{end}}
+             {{end}}
+            <input type="submit" value="Save and Send to Agent"/>
+            </form>
+        </td>
+    </tr>
+</table>
+
+<hr/>
+
+<h3>Client Certificate</h3>
+
+<table border="1" style="border-collapse: collapse">
+    {{if .ClientCert}}
+    <tr>
+        <td>Subject:</td><td>{{ .ClientCert.Subject }}</td>
+    </tr>
+    <tr>
+        <td>Not Valid Before:</td><td>{{ .ClientCert.NotBefore }}</td>
+    </tr>
+    <tr>
+        <td>Not Valid After:</td><td>{{ .ClientCert.NotAfter }}</td>
+    </tr>
+    <tr>
+        <td>SHA256 Fingerprint:</td><td>{{ .ClientCertSha256Fingerprint }}</td>
+    </tr>
+    {{else}}
+    <tr>
+        <td><span style="color:red">Client did not supply start certificate.</span></td>
+    </tr>
+    {{end}}
+</table>
+
+{{if .ClientCertOfferError }}
+<br/>
+<span style="color:red">Cannot apply offered certificate: {{ .ClientCertOfferError }}</span>
+<br/>
+{{end}}
+
+<br/>
+<form action="/rotate_client_cert" method="post">
+    <input type="hidden" name="instanceid" value="{{ .InstanceIdStr }}"/>
+    {{if .ClientCert}}
+    <input type="submit" value="Rotate Client Certificate"/>
+    {{else}}
+    <input type="submit" value="Accept and Offer Client Certificate"/>
+    {{end}}
+</form>
+
+<h3>OpAMP Connection Settings</h3>
+
+<br/>
+
+<form action="/opamp_connection_settings" method="post">
+    <input type="hidden" name="instanceid" value="{{ .InstanceIdStr }}"/>
+    <input type="radio" name="tls_min" value="TLSv1.0">
+      <label for="TLSv1.0">TLSv1.0</label><br/>
+    <input type="radio" name="tls_min" value="TLSv1.1">
+      <label for="TLSv1.1">TLSv1.1</label><br/>
+    <input type="radio" name="tls_min" value="TLSv1.2">
+      <label for="TLSv1.2">TLSv1.2</label><br/>
+    <input type="radio" name="tls_min" value="TLSv1.3">
+      <label for="TLSv1.3">TLSv1.3</label><br/>
+
+    <label for="proxy_url">Proxy URL:</label>
+      <input type="text" id="proxy_url" name="proxy_url"><br/>
+
+    <input type="submit" value="Set connection settings"/>
+</form>
+
+</body>
+</html>
+
+<hr/>
+
+<h3>Custom Messages</h3>
+
+<h4>Send Custom Message</h4>
+<form action="/send_custom_message" method="post">
+    <input type="hidden" name="instanceid" value="{{ .InstanceIdStr }}"/>
+    
+    <label for="capability">Capability:</label>
+        <input type="text" name="capability" value="io.opentelemetry.custom.health" size="30"/><br/>
+
+    <label for="type">Type:</label>
+        <input type="text" name="type" value="get_health" size="30"/><br/>
+
+    <label for="data">Data:</label>
+        <input type="text" name="data" value="" size="30"/><br/>
+
+    <input type="submit" value="Send Custom Message" />
+</form>
+
+<h4>Received Messages</h4>
+
+{{ if eq (len .CustomMessageHistory) 0 }}
+No Received Messages
+{{ else }}
+Last {{ len .CustomMessageHistory }} Received Messages
+<pre class="log-container"><code>{{ range .CustomMessageHistory }}{{ . }}
+{{ end }}
+</code></pre>
+{{ end }} 

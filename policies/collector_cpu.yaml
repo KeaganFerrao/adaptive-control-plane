@@ -1,0 +1,45 @@
+name: high_mem_and_refused_spans
+
+when:
+  and:
+    - condition:
+        metric: otelcol_process_runtime_heap_alloc_bytes
+        operator: ">="
+        threshold: 60000000 # 60MB
+        threshold_type: absolute
+
+        scope: # scope defines the component name and if we need to select a single instance of a component or not
+          component: otel-collector-1
+          instance: collector-1 # if instance is present, aggregation cannot be, both cannot be present, error out
+    - condition:
+        metric: otelcol_processor_memory_limiter_refused_spans
+        operator: ">"
+        threshold: 100
+        threshold_type: absolute
+        scope:
+          component: otel-collector-1
+          instance: collector-2
+
+for: 30s
+
+then:
+  - action: set_collector_sampling
+    parameters:
+      value: 1
+
+recover:
+  when:
+    condition:
+        metric: otelcol_process_runtime_heap_alloc_bytes
+        operator: "<"
+        threshold: 60000000 # 60MB
+        threshold_type: absolute
+        scope:
+          component: otel-collector-1
+
+  for: 30s
+
+  then:
+    - action: set_collector_sampling
+      parameters:
+        value: 0
